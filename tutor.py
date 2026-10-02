@@ -18,6 +18,9 @@ def _ollama(prompt: str) -> str | None:
                 "model": MODEL,
                 "prompt": prompt,
                 "stream": False,
+                # gemma4 is a thinking model: without this the reasoning consumes the
+                # whole num_predict budget and `response` comes back empty.
+                "think": False,
                 "options": {"num_predict": 220, "temperature": 0.4},
             }).encode(),
             headers={"Content-Type": "application/json"},
