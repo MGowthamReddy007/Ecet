@@ -1,0 +1,26 @@
+# Netlify config for ECET Mentor.
+#
+# Netlify can only host the static frontend (Netlify Functions support
+# JavaScript/TypeScript/Go only — not Python), so the FastAPI backend runs on a
+# separate Python host and is reached through the proxy rules below.
+#
+# ACTION REQUIRED: replace BACKEND_HOST in both `to` values with your deployed
+# backend URL (no trailing slash), e.g. https://ecet-mentor.up.railway.app
+# Then commit + push; Netlify redeploys automatically.
+
+[build]
+  # No build step: static/index.html is plain HTML/CSS/JS.
+  publish = "static"
+
+# Proxy API traffic to the FastAPI backend so the browser stays same-origin.
+[[redirects]]
+  from = "/api/*"
+  to = "https://BACKEND_HOST/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/health"
+  to = "https://BACKEND_HOST/health"
+  status = 200
+  force = true
