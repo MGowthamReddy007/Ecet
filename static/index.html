@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d1e">
+<title>ECET Mentor — Adaptive AI Tutor</title>
+<style>
+  /* ================= THEME TOKENS ================= */
+  :root{
+    --pri:#8b5cf6; --pri2:#22d3ee; --acc:#f472b6;
+    --ok:#2ee6a6; --warn:#fbbf24; --bad:#fb7185; --gold:#fbbf24;
+    --radius:20px; --pad:16px; --navh:68px;
+    --grad:linear-gradient(135deg,var(--pri),var(--pri2));
+    --grad2:linear-gradient(120deg,var(--pri),var(--acc) 55%,var(--pri2));
+  }
+  html[data-theme="dark"]{
+    --bg:#0a0d1e; --bg2:#141a3a;
+    --card:rgba(28,34,72,.66); --card-solid:#1b2148; --card2:#232a52;
+    --line:rgba(130,150,240,.16); --tx:#eef1fb; --mut:#9aa4c9;
+    --input:#141a3a; --glass:blur(14px);
+    --shadow:0 16px 36px rgba(3,6,20,.55);
+    --glow:0 8px 26px rgba(139,92,246,.45);
+  }
+  html[data-theme="light"]{
+    --bg:#e9edfb; --bg2:#ffffff;
+    --card:#ffffff; --card-solid:#ffffff; --card2:#f2f5ff;
+    --line:#dfe4f6; --tx:#12162e; --mut:#5d6688;
+    --input:#f4f7ff; --glass:blur(0px);
+    --shadow:0 12px 28px rgba(72,92,160,.16);
+    --glow:0 8px 22px rgba(109,64,220,.28);
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;-webkit-tap-highlight-color:transparent}
+  html,body{min-height:100%}
+  body{background:var(--bg);color:var(--tx);transition:background .3s ease,color .3s ease}
+  img,svg{max-width:100%}
+
+  /* ---------- animated backdrop ---------- */
+  .app{
+    min-height:100vh;position:relative;overflow-x:hidden;
+    display:flex;justify-content:center;
+    background:
+      radial-gradient(1100px 520px at 82% -12%, rgba(139,92,246,.35), transparent 60%),
+      radial-gradient(900px 480px at 0% 8%, rgba(34,211,238,.22), transparent 55%),
+      radial-gradient(800px 600px at 100% 100%, rgba(244,114,182,.16), transparent 60%),
+      var(--bg);
+  }
+  .app::before{
+    content:"";position:fixed;width:420px;height:420px;top:-140px;left:-120px;border-radius:50%;
+    background:radial-gradient(circle, rgba(34,211,238,.35), transparent 65%);
+    filter:blur(30px);pointer-events:none;animation:float1 14s ease-in-out infinite;
+  }
+  .app::after{
+    content:"";position:fixed;width:460px;height:460px;bottom:-180px;right:-140px;border-radius:50%;
+    background:radial-gradient(circle, rgba(244,114,182,.30), transparent 65%);
+    filter:blur(34px);pointer-events:none;animation:float2 17s ease-in-out infinite;
+  }
+  @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
+  @keyframes float2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,-36px)}}
+
+  .shell{width:100%;max-width:1240px;display:flex;flex-direction:column;position:relative;z-index:1}
+  .content{flex:1;display:flex;flex-direction:column;min-width:0}
+
+  /* ---------- top bar ---------- */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:calc(14px + env(safe-area-inset-top)) var(--pad) 10px;
+    position:sticky;top:0;z-index:20;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--bg) 92%, transparent), color-mix(in srgb, var(--bg) 55%, transparent));
+    backdrop-filter:blur(14px)}
+  .logo{font-weight:800;font-size:1.08rem;letter-spacing:.2px;white-space:nowrap;
+    background:var(--grad2);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+    animation:shimmer 6s linear infinite}
+  @keyframes shimmer{to{background-position:200% 0}}
+  .pills{display:flex;gap:8px;align-items:center}
+  .pill{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:5px 12px;
+    font-size:.72rem;color:var(--mut);display:flex;gap:6px;align-items:center;white-space:nowrap;
+    box-shadow:var(--shadow);backdrop-filter:var(--glass)}
+  .pill b{color:var(--tx)}
+  #btnTheme{cursor:pointer;user-select:none;border:1px solid var(--line);background:var(--card)}
+  #btnTheme:active{transform:scale(.92)}
+
+  /* ---------- screens ---------- */
+  .screen{display:none;flex:1;flex-direction:column;overflow-y:auto;
+    padding:8px var(--pad) calc(var(--navh) + 40px);animation:fade .28s ease}
+  .screen.active{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .screen::-webkit-scrollbar{width:0}
+
+  h2.title{font-size:1.06rem;margin:8px 0 14px;display:flex;align-items:center;gap:9px}
+  h2.title::before{content:"";width:5px;height:18px;border-radius:4px;background:var(--grad)}
+  .muted{color:var(--mut);font-size:.78rem;line-height:1.55}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:15px;margin-bottom:12px;box-shadow:var(--shadow);backdrop-filter:var(--glass);
+    transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease}
+  .card.click{cursor:pointer}
+  .card.click:hover{transform:translateY(-2px);border-color:color-mix(in srgb, var(--pri) 55%, var(--line))}
+  .card.click:active{transform:scale(.985)}
+
+  /* ---------- login ---------- */
+  #screen-login{justify-content:center;padding-bottom:40px}
+  #screen-login>.card,#screen-login>.hero-emoji,#screen-login>.hero-title,#screen-login>.hero-sub,#screen-login>.demo-hint{width:100%;max-width:440px;margin-left:auto;margin-right:auto}
+  .hero-emoji{font-size:3.2rem;text-align:center;margin-bottom:8px;filter:drop-shadow(0 10px 24px rgba(139,92,246,.45));animation:bob 3.2s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  .hero-title{text-align:center;font-size:1.7rem;font-weight:900;letter-spacing:.3px;
+    background:var(--grad2);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 6s linear infinite}
+  .hero-sub{text-align:center;margin:8px 0 22px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:.72rem;color:var(--mut);margin-bottom:6px;font-weight:600}
+  .field input,.field select{width:100%;background:var(--input);border:1px solid var(--line);border-radius:14px;
+    padding:13px 14px;color:var(--tx);font-size:.9rem;outline:none;appearance:none;transition:.18s}
+  .field input:focus,.field select:focus{border-color:var(--pri);box-shadow:0 0 0 3px color-mix(in srgb, var(--pri) 22%, transparent)}
+  .btn{width:100%;border:none;border-radius:16px;padding:14px;font-size:.95rem;font-weight:700;cursor:pointer;transition:.18s}
+  .btn:active{transform:scale(.97)}
+  .btn-pri{background:var(--grad);color:#fff;box-shadow:var(--glow)}
+  .btn-pri:hover{filter:brightness(1.06)}
+  .btn-ghost{background:var(--card-solid);color:var(--tx);border:1px solid var(--line)}
+  .demo-hint{margin-top:14px;text-align:center;font-size:.7rem;color:var(--mut)}
+  .demo-hint b{color:var(--gold);cursor:pointer;text-decoration:underline}
+
+  /* ---------- stats ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+  .stat{position:relative;overflow:hidden;background:var(--card);border:1px solid var(--line);border-radius:18px;
+    padding:12px 10px;text-align:center;box-shadow:var(--shadow)}
+  .stat::before{content:"";position:absolute;inset:0 0 auto 0;height:3px;background:var(--grad)}
+  .s-ic{font-size:1rem;display:block;margin-bottom:4px}
+  .stat .v{font-size:1.2rem;font-weight:900;letter-spacing:.2px}
+  .stat .l{font-size:.6rem;color:var(--mut);margin-top:2px}
+  .stat .v.ok{color:var(--ok)} .stat .v.gold{color:var(--gold)}
+
+  /* ---------- progress bar ---------- */
+  .bar{height:9px;background:color-mix(in srgb, var(--tx) 10%, transparent);border-radius:6px;overflow:hidden;margin-top:8px}
+  .bar>i{display:block;height:100%;border-radius:6px;background:var(--grad);transition:width .7s cubic-bezier(.2,.8,.2,1)}
+
+  /* ---------- chips ---------- */
+  .tag{display:inline-block;font-size:.6rem;padding:3px 10px;border-radius:999px;font-weight:600;
+    background:color-mix(in srgb, var(--pri) 16%, transparent);color:var(--pri);border:1px solid color-mix(in srgb, var(--pri) 35%, transparent)}
+  .tag.p{background:rgba(34,211,238,.14);color:#0ea5b7;border-color:rgba(34,211,238,.4)}
+  .tag.g{background:rgba(251,191,36,.16);color:#c98a06;border-color:rgba(251,191,36,.45)}
+  html[data-theme="dark"] .tag.p{color:#67e8f9}
+  html[data-theme="dark"] .tag.g{color:#fcd34d}
+
+  /* ---------- segment control ---------- */
+  .seg{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:5px;margin-bottom:12px;box-shadow:var(--shadow)}
+  .seg-btn{flex:1;background:none;border:none;color:var(--mut);font-size:.74rem;font-weight:700;padding:10px 4px;
+    border-radius:12px;cursor:pointer;transition:.18s;line-height:1.2}
+  .seg-btn.on{background:var(--grad);color:#fff;box-shadow:var(--glow)}
+  .filters{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .filters select{flex:1 1 140px;min-width:0;background:var(--input);border:1px solid var(--line);border-radius:12px;
+    padding:11px;color:var(--tx);font-size:.76rem;outline:none;appearance:none}
+
+  /* ---------- question ---------- */
+  .q-subject{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+  .q-text{font-size:1.03rem;font-weight:600;line-height:1.5;margin-bottom:6px}
+  .opt{display:flex;align-items:center;gap:12px;background:var(--card-solid);border:1.5px solid var(--line);
+    border-radius:15px;padding:14px;margin-bottom:10px;cursor:pointer;font-size:.9rem;transition:.16s}
+  .opt:hover{border-color:color-mix(in srgb, var(--pri) 50%, var(--line));transform:translateX(2px)}
+  .opt:active{transform:scale(.985)}
+  .opt .key{width:30px;height:30px;border-radius:10px;background:var(--input);display:flex;align-items:center;
+    justify-content:center;font-weight:800;font-size:.8rem;color:var(--mut);flex-shrink:0}
+  .opt.sel{border-color:var(--pri);background:color-mix(in srgb, var(--pri) 14%, var(--card-solid))}
+  .opt.right{border-color:var(--ok);background:color-mix(in srgb, var(--ok) 16%, var(--card-solid))}
+  .opt.right .key{background:var(--ok);color:#04110c}
+  .opt.wrong{border-color:var(--bad);background:color-mix(in srgb, var(--bad) 16%, var(--card-solid))}
+  .opt.wrong .key{background:var(--bad);color:#fff}
+  .opt.lock{pointer-events:none;opacity:.95}
+
+  .feedback{border-radius:16px;padding:14px;margin:4px 0 12px;font-size:.85rem;line-height:1.6;animation:fade .3s ease}
+  .feedback.ok{background:color-mix(in srgb, var(--ok) 14%, var(--card-solid));border:1px solid color-mix(in srgb, var(--ok) 45%, transparent)}
+  .feedback.bad{background:color-mix(in srgb, var(--bad) 14%, var(--card-solid));border:1px solid color-mix(in srgb, var(--bad) 45%, transparent)}
+  .feedback .fb-title{font-weight:800;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .feedback .src{font-size:.6rem;color:var(--mut);border:1px solid var(--line);padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .next-btn{margin-top:4px}
+
+  /* ---------- rows ---------- */
+  .row-line{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;gap:8px}
+  .row-line .n{font-size:.8rem}
+  .row-line .p{font-size:.72rem;color:var(--mut);white-space:nowrap}
+
+  /* ---------- mock ---------- */
+  .mock-qnum{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px}
+  .mock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(28px,1fr));gap:6px;margin:10px 0 14px}
+  .mdot{height:26px;border-radius:8px;background:var(--input);border:1px solid var(--line);display:flex;align-items:center;
+    justify-content:center;font-size:.6rem;color:var(--mut);cursor:pointer;transition:.15s}
+  .mdot.ans{background:var(--grad);color:#fff;border-color:transparent}
+  .mdot.cur{outline:2px solid var(--pri2)}
+
+  /* ---------- charts ---------- */
+  .bars{display:flex;align-items:flex-end;gap:6px;height:110px;padding:8px 2px 0;overflow-x:auto}
+  .bars .b{flex:1 0 10px;background:linear-gradient(180deg,var(--pri2),var(--pri));border-radius:7px 7px 3px 3px;
+    min-height:4px;position:relative;animation:grow .7s ease}
+  @keyframes grow{from{height:0}}
+  .bars .b span{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:.56rem;color:var(--mut)}
+
+  /* ---------- leaderboard ---------- */
+  .lb{display:flex;align-items:center;gap:12px;padding:12px;background:var(--card-solid);border:1px solid var(--line);
+    border-radius:16px;margin-bottom:9px;transition:.16s}
+  .lb:hover{transform:translateX(2px)}
+  .lb .r{width:32px;height:32px;border-radius:50%;background:var(--input);display:flex;align-items:center;
+    justify-content:center;font-weight:800;font-size:.8rem;color:var(--warn);flex-shrink:0}
+  .lb.gold .r{background:linear-gradient(135deg,#fcd34d,#f59e0b);color:#3a2500}
+  .lb.silver .r{background:linear-gradient(135deg,#e5e9f5,#b6bed6);color:#20263a}
+  .lb.bronze .r{background:linear-gradient(135deg,#e0a76a,#b9773a);color:#2a1700}
+  .lb.me{border-color:var(--pri2);background:linear-gradient(135deg,color-mix(in srgb,var(--pri) 18%,var(--card-solid)),var(--card-solid))}
+  .lb .nm{flex:1;font-size:.85rem;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .lb .nm small{display:block;color:var(--mut);font-size:.62rem}
+  .lb .xp{font-size:.8rem;font-weight:800;color:var(--pri2);white-space:nowrap}
+
+  .rank-banner{display:flex;align-items:center;gap:16px;border:1px solid var(--line);border-radius:22px;
+    padding:18px;margin-bottom:12px;box-shadow:var(--shadow);
+    background:
+      radial-gradient(160px 160px at 100% 0%, rgba(34,211,238,.32), transparent 70%),
+      linear-gradient(135deg, color-mix(in srgb,var(--pri) 20%,var(--card)), var(--card))}
+  .rank-banner .big-rank{font-size:2.2rem;font-weight:900;background:linear-gradient(90deg,var(--gold),var(--pri2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .rank-banner .lbl{font-size:.7rem;color:var(--mut)}
+
+  /* ---------- progress ring ---------- */
+  .ring{margin-left:auto;flex-shrink:0}
+  .ring-box{position:relative;width:80px;height:80px;display:grid;place-items:center}
+  .ring-svg{position:absolute;inset:0;filter:drop-shadow(0 6px 14px rgba(139,92,246,.35))}
+  .ring-box .circle{transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1)}
+  .ring-txt{position:relative;text-align:center;line-height:1}
+  .ring-txt b{font-size:1rem;font-weight:900}
+  .ring-txt small{display:block;font-size:.5rem;color:var(--mut);margin-top:3px;letter-spacing:.3px}
+  .s-ic-inline{font-size:.95rem;margin-right:5px}
+
+  /* ---------- impact ---------- */
+  .big{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+  .big .kpi{background:linear-gradient(135deg,var(--card2),var(--card));border:1px solid var(--line);
+    border-radius:20px;padding:18px 12px;text-align:center;box-shadow:var(--shadow)}
+  .kpi .v{font-size:1.8rem;font-weight:900;background:linear-gradient(90deg,var(--ok),var(--pri2));
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .kpi .l{font-size:.62rem;color:var(--mut);margin-top:4px;line-height:1.4}
+
+  /* ---------- nav ---------- */
+  .nav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;
+    background:color-mix(in srgb, var(--bg) 88%, transparent);backdrop-filter:blur(16px);
+    border-top:1px solid var(--line);padding:8px 6px calc(8px + env(safe-area-inset-bottom))}
+  .nav button{flex:1;background:none;border:none;color:var(--mut);font-size:.6rem;display:flex;flex-direction:column;
+    align-items:center;gap:3px;cursor:pointer;padding:6px 0;border-radius:14px;transition:.18s;position:relative}
+  .nav button .ic{font-size:1.3rem;transition:transform .2s ease}
+  .nav button.on{color:var(--pri)}
+  .nav button.on .ic{transform:translateY(-2px) scale(1.1);filter:drop-shadow(0 6px 10px rgba(139,92,246,.6))}
+  .nav button.on::before{content:"";position:absolute;top:0;width:26px;height:3px;border-radius:3px;background:var(--grad)}
+
+  /* ---------- confetti ---------- */
+  #confetti{position:fixed;inset:0;pointer-events:none;z-index:50;display:none}
+  .cf{position:absolute;width:9px;height:9px;border-radius:2px;animation:fall 1.6s ease-in forwards}
+  @keyframes fall{0%{transform:translateY(-10vh) rotate(0)}100%{transform:translateY(105vh) rotate(720deg);opacity:.6}}
+
+  .streak-fire{display:inline-block;animation:flick .8s infinite alternate}
+  @keyframes flick{from{transform:scale(1) rotate(-4deg)}to{transform:scale(1.15) rotate(5deg)}}
+  .hidden{display:none!important}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  /* ================= RESPONSIVE ================= */
+  @media (max-width:360px){
+    :root{--pad:12px}
+    .logo{font-size:.98rem}
+    .pill{padding:4px 9px;font-size:.64rem}
+    .stat .v{font-size:1.02rem}
+    .seg-btn{font-size:.64rem;padding:8px 2px}
+  }
+  @media (min-width:560px){
+    :root{--pad:22px}
+    .screen{max-width:760px;width:100%;margin:0 auto}
+    .kpi .v{font-size:2rem}
+  }
+  @media (min-width:768px){
+    :root{--pad:28px}
+    .screen{max-width:880px}
+    .stats .stat{padding:16px}
+    .stat .v{font-size:1.45rem}
+    .q-text{font-size:1.1rem}
+    .opt{font-size:.95rem;padding:16px}
+    .seg-btn{font-size:.8rem}
+  }
+  @media (min-width:900px){
+    :root{--pad:32px}
+    .shell{flex-direction:row;align-items:flex-start}
+    .content{flex:1;min-width:0}
+    .top{padding-left:26px;padding-right:26px}
+    .nav{position:sticky;top:0;align-self:flex-start;width:240px;height:100vh;flex-direction:column;
+      justify-content:flex-start;gap:6px;border-top:none;border-right:1px solid var(--line);padding:26px 16px;
+      background:color-mix(in srgb, var(--bg2) 60%, transparent);overflow-y:auto}
+    .nav::before{content:"🎓 ECET Mentor";font-weight:800;font-size:1.05rem;padding:0 12px 18px;
+      background:var(--grad2);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 6s linear infinite}
+    .nav button{flex:0 0 auto;flex-direction:row;justify-content:flex-start;gap:12px;font-size:.88rem;font-weight:600;padding:13px 14px}
+    .nav button .ic{font-size:1.15rem}
+    .nav button.on{background:linear-gradient(135deg,color-mix(in srgb,var(--pri) 24%,transparent),color-mix(in srgb,var(--pri2) 16%,transparent))}
+    .nav button.on::before{display:none}
+    .screen{padding-bottom:32px;max-width:none}
+    .screen>*{max-width:920px;width:100%;margin-left:auto;margin-right:auto}
+    #screen-login{justify-content:center}
+    .bars{overflow:visible}
+    .top{justify-content:flex-end}
+    .top .logo{display:none}
+  }
+  @media (min-width:1200px){
+    .screen>*{max-width:1020px}
+    .big{grid-template-columns:repeat(4,1fr)}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="shell">
+
+    <nav class="nav">
+      <button data-tab="home" class="on" onclick="go('tab-home')"><span class="ic">🏠</span>Home</button>
+      <button data-tab="practice" onclick="go('tab-practice')"><span class="ic">🎯</span>Practice</button>
+      <button data-tab="mockstart" onclick="openMockChooser()"><span class="ic">📝</span>Mock</button>
+      <button data-tab="progress" onclick="go('tab-progress')"><span class="ic">📈</span>Progress</button>
+      <button data-tab="impact" onclick="go('tab-impact')"><span class="ic">🏆</span>Impact</button>
+    </nav>
+
+    <div class="content">
+      <div class="top">
+        <div class="logo">🎓 ECET Mentor</div>
+        <div class="pills">
+          <div class="pill" id="pillXp">⚡ <b>0</b> XP</div>
+          <div class="pill" id="pillStreak"><span class="streak-fire">🔥</span> <b>0</b></div>
+          <button class="pill" id="btnTheme" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+        </div>
+      </div>
+
+      <!-- ================= LOGIN ================= -->
+      <div class="screen active" id="screen-login">
+        <div class="hero-emoji">🤖📚</div>
+        <div class="hero-title">ECET Mentor</div>
+        <p class="muted hero-sub">Your personal AI tutor for ECET 2027<br>Model questions · Last 10 years repeated questions · Adaptive practice</p>
+        <div class="card">
+          <div class="field"><label>Your name</label><input id="inName" placeholder="e.g., Gowtham"></div>
+          <div class="field"><label>Roll number</label><input id="inRoll" placeholder="e.g., DIP23-201"></div>
+          <div class="field"><label>Branch</label>
+            <select id="inBranch"><option>CSE</option><option>ECE</option><option>EEE</option><option>MECH</option><option>CIVIL</option></select>
+          </div>
+          <button class="btn btn-pri" onclick="login()">Start Learning →</button>
+        </div>
+        <p class="demo-hint">Judge demo? Tap <b onclick="quickLogin()">here</b> to enter as a sample student with 3 weeks of history.</p>
+      </div>
+
+      <!-- ================= HOME ================= -->
+      <div class="screen" id="screen-home">
+        <h2 class="title" id="hiName">Hey! 👋</h2>
+        <div class="stats">
+          <div class="stat"><span class="s-ic">🏅</span><div class="v gold" id="stRank">—</div><div class="l">College Rank</div></div>
+          <div class="stat"><span class="s-ic">🚀</span><div class="v ok" id="stImprove">—</div><div class="l">Mock Gain</div></div>
+          <div class="stat"><span class="s-ic">📚</span><div class="v" id="stCoverage">—</div><div class="l">Bank Covered</div></div>
+        </div>
+
+        <div class="card click" onclick="go('tab-practice')">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <b style="font-size:.95rem">🎯 Today's Mission</b><span class="tag" id="planCount">3 topics</span>
+          </div>
+          <p class="muted">Adaptive practice picked from YOUR weak topics.</p>
+          <div class="bar"><i id="planBar" style="width:0%"></i></div>
+        </div>
+
+        <div class="card click" onclick="openMockChooser()">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <b style="font-size:.95rem">📝 Full Mock Test</b><span class="tag p">ECET pattern</span>
+          </div>
+          <p class="muted">Quick 20 or the real 200-question ECET paper — built from the practice bank.</p>
+        </div>
+
+        <div class="card">
+          <b style="font-size:.9rem">📌 Weak Topics</b>
+          <div id="weakList" style="margin-top:10px"></div>
+        </div>
+      </div>
+
+      <!-- ================= PRACTICE ================= -->
+      <div class="screen" id="screen-practice">
+        <h2 class="title">🎯 Practice</h2>
+        <div class="seg" id="pmode">
+          <button class="seg-btn on" data-mode="adaptive" onclick="setPmode('adaptive')">Adaptive</button>
+          <button class="seg-btn" data-mode="model" onclick="setPmode('model')">Model Qs</button>
+          <button class="seg-btn" data-mode="pyq" onclick="setPmode('pyq')">🔁 Last 10 Yrs Repeated</button>
+        </div>
+
+        <div id="bankFilters" class="filters hidden">
+          <select id="fTrack" onchange="onTrackChange();nextQ()"></select>
+          <select id="fSubject" onchange="nextQ()"></select>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <b style="font-size:.84rem" id="covLabel">Practice progress</b>
+            <span class="muted" id="covPct">—</span>
+          </div>
+          <div class="bar"><i id="covBar" style="width:0%"></i></div>
+          <p class="muted" id="covDetail" style="margin-top:8px"></p>
+        </div>
+
+        <div class="card" id="qCard">
+          <div class="q-subject">
+            <span class="tag" id="qTopic">—</span>
+            <span id="qMeta" class="muted">—</span>
+          </div>
+          <div class="q-text" id="qText">Loading…</div>
+          <div id="optBox" style="margin-top:12px"></div>
+          <div id="fbBox"></div>
+          <button class="btn btn-pri next-btn hidden" id="btnNext" onclick="nextQ()">Next Question →</button>
+        </div>
+      </div>
+
+      <!-- ================= MOCK CHOOSER ================= -->
+      <div class="screen" id="screen-mockstart">
+        <h2 class="title">📝 Start a Mock Test</h2>
+        <div class="card click" onclick="startMock('quick')">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <b style="font-size:.95rem">⚡ Quick Mock</b><span class="tag p">20 Q</span>
+          </div>
+          <p class="muted">Maths 5 · Physics 3 · Chemistry 2 · Engineering 10</p>
+        </div>
+        <div class="card click" onclick="startMock('full')">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <b style="font-size:.95rem">🎯 Full ECET Mock</b><span class="tag g">200 Q</span>
+          </div>
+          <p class="muted">Real pattern: Maths 50 · Physics 25 · Chemistry 25 · Engineering 100</p>
+        </div>
+        <p class="muted" id="fullNote" style="text-align:center"></p>
+      </div>
+
+      <!-- ================= MOCK ================= -->
+      <div class="screen" id="screen-mock">
+        <div class="mock-qnum">
+          <b id="mockNum">Q1 / 20</b>
+          <button class="btn btn-pri" style="width:auto;padding:9px 16px;font-size:.75rem" onclick="submitMock()">Submit ✓</button>
+        </div>
+        <div class="mock-grid" id="mockGrid"></div>
+        <div class="card" id="mockCard">
+          <div class="q-subject"><span class="tag" id="mTopic">—</span><span class="muted" id="mTrack">—</span></div>
+          <div class="q-text" id="mText"></div>
+          <div id="mOptBox"></div>
+          <div style="display:flex;gap:10px;margin-top:6px">
+            <button class="btn btn-ghost" onclick="mockNav(-1)">← Prev</button>
+            <button class="btn btn-ghost" onclick="mockNav(1)">Next →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= RESULT ================= -->
+      <div class="screen" id="screen-result">
+        <h2 class="title">📊 Mock Result</h2>
+        <div class="card" style="text-align:center;padding:26px">
+          <div style="font-size:2.8rem;font-weight:900;color:var(--ok)" id="resScore">—</div>
+          <p class="muted" id="resDetail"></p>
+          <div class="bar" style="margin-top:14px"><i id="resBar" style="width:0%"></i></div>
+        </div>
+        <div class="card">
+          <b style="font-size:.9rem">🤖 Aria says…</b>
+          <p class="muted" id="resAdvice" style="margin-top:8px"></p>
+        </div>
+        <button class="btn btn-pri" onclick="go('tab-home')">Back to Home 🏠</button>
+      </div>
+
+      <!-- ================= PROGRESS ================= -->
+      <div class="screen" id="screen-progress">
+        <h2 class="title">📈 My Progress</h2>
+
+        <div class="rank-banner">
+          <div class="big-rank" id="pgRank">#—</div>
+          <div>
+            <div style="font-weight:800;font-size:.95rem" id="pgRankLbl">College Rank</div>
+            <div class="lbl" id="pgRankSub">among your cohort</div>
+          </div>
+          <div class="ring" id="pgRing" aria-hidden="true"></div>
+        </div>
+
+        <div class="card">
+          <b style="font-size:.9rem">🏆 Ranks — XP leaderboard</b>
+          <div id="pgLeaderboard" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <b style="font-size:.9rem">📚 Practice progress</b>
+            <span class="muted" id="pgCovPct">—</span>
+          </div>
+          <div class="bar"><i id="pgCovBar" style="width:0%"></i></div>
+          <div id="pgCovTracks" style="margin-top:12px"></div>
+        </div>
+
+        <div class="card">
+          <b style="font-size:.9rem">🗓️ Daily practice (last 14 days)</b>
+          <div class="bars" id="dailyBars"></div>
+        </div>
+        <div class="card">
+          <b style="font-size:.9rem">📝 Mock test scores</b>
+          <div class="bars" id="mockBars" style="height:90px"></div>
+          <p class="muted" id="mockGain" style="margin-top:8px"></p>
+        </div>
+        <div class="card">
+          <b style="font-size:.9rem">📚 Subject-wise accuracy</b>
+          <div id="subjList" style="margin-top:12px"></div>
+        </div>
+        <div class="card">
+          <b style="font-size:.9rem">🧩 Topic mastery</b>
+          <div id="topicList" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <!-- ================= IMPACT ================= -->
+      <div class="screen" id="screen-impact">
+        <h2 class="title">🏆 Impact &amp; Cohort</h2>
+        <div class="big" id="impactKpis"></div>
+        <div class="card">
+          <b style="font-size:.9rem">⚡ XP Leaderboard — this college</b>
+          <div id="lbList" style="margin-top:12px"></div>
+        </div>
+        <p class="muted" style="text-align:center;margin-top:8px">Real users · Real improvement · Measured daily 📊</p>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="confetti"></canvas>
+</div>
+
+<script>
+const API = "";
+let S = { student: null, lang: "en", pmode: "adaptive", filterTrack: "all", filterSubject: "all",
+          curQ: null, locked: false, meta: null, mock: null, mIdx: 0, mAns: {} };
+
+const $ = id => document.getElementById(id);
+async function api(path, opts={}) {
+  const r = await fetch(API + path, { headers: {"Content-Type":"application/json"}, ...opts });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+function go(tab){
+  const name = tab.replace("tab-","");
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  $("screen-"+name)?.classList.add("active");
+  document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("on", b.dataset.tab===name));
+  if(name==="home") renderHome();
+  if(name==="practice" && S.student) nextQ();
+  if(name==="progress") renderProgress();
+  if(name==="impact") renderImpact();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+function confetti(){
+  const c=$("confetti"); c.style.display="block"; c.innerHTML="";
+  const cols=["#8b5cf6","#22d3ee","#2ee6a6","#fbbf24","#f472b6"];
+  for(let i=0;i<70;i++){
+    const d=document.createElement("div"); d.className="cf";
+    d.style.cssText=`left:${Math.random()*100}%;background:${cols[i%5]};animation-delay:${Math.random()*.5}s;top:-5vh`;
+    c.appendChild(d);
+  }
+  setTimeout(()=>{c.style.display="none";c.innerHTML=""},2200);
+}
+
+// ---------- visuals: subject icons + progress ring ----------
+const SUBJECT_ICONS = {
+  "Mathematics":"📐", "Physics":"⚛️", "Chemistry":"🧪", "Engineering":"🛠️",
+  "C Programming":"💻", "Data Structures":"🧱", "Operating Systems":"🖥️",
+  "DBMS":"🗄️", "Computer Networks":"🌐"
+};
+const subjIcon = s => SUBJECT_ICONS[s] || "📘";
+let __ringSeq = 0;
+function ringSVG(pct, label="COVERED", size=80, stroke=9){
+  const clamped = Math.min(100, Math.max(0, pct));
+  const r=(size-stroke)/2, c=2*Math.PI*r, off=c*(1-clamped/100);
+  const id="rg"+(++__ringSeq);
+  return `<div class="ring-box">
+    <svg class="ring-svg" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#8b5cf6"/><stop offset="100%" stop-color="#22d3ee"/>
+      </linearGradient></defs>
+      <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="color-mix(in srgb, currentColor 16%, transparent)" stroke-width="${stroke}"/>
+      <circle class="circle" cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${stroke}"
+        stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${off.toFixed(1)}"
+        transform="rotate(-90 ${size/2} ${size/2})"/>
+    </svg>
+    <span class="ring-txt"><b>${Math.round(clamped)}%</b><small>${label}</small></span>
+  </div>`;
+}
+
+// ---------- theme ----------
+function setTheme(t){
+  document.documentElement.dataset.theme=t;
+  const b=$("btnTheme"); if(b) b.textContent = t==="light" ? "☀️" : "🌙";
+  try{ localStorage.setItem("ecet-theme", t); }catch(e){}
+}
+(function(){
+  let t=null; try{ t=localStorage.getItem("ecet-theme"); }catch(e){}
+  setTheme(t || "dark");
+})();
+
+// ---------- login ----------
+async function quickLogin(){
+  $("inName").value="Gowtham (Demo)";
+  $("inRoll").value="DIP23-001";
+  $("inBranch").value="CSE";
+  login();
+}
+async function login(){
+  const name=$("inName").value.trim() || "Student";
+  const roll=$("inRoll").value.trim() || ("DEMO-"+Date.now()%10000);
+  const data=await api("/api/login",{method:"POST",body:JSON.stringify({name,roll_no:roll,branch:$("inBranch").value,lang:"en"})});
+  S.student=data.student;
+  $("hiName").textContent=`Hey, ${name.split(" ")[0]}! 👋`;
+  go("tab-home");
+  loadPlan();
+  loadMeta();
+}
+function setXp(xp,streak){ $("pillXp").innerHTML=`⚡ <b>${xp}</b> XP`; $("pillStreak").innerHTML=`<span class="streak-fire">🔥</span> <b>${streak}</b>`; }
+
+// ---------- plan + home ----------
+async function loadPlan(){
+  const d=await api(`/api/plan/${S.student.id}`);
+  setXp(d.xp,d.streak);
+  $("planCount").textContent=d.plan.length+" topics";
+  const done=d.plan.filter(p=>p.completed).length;
+  $("planBar").style.width=(100*done/Math.max(1,d.plan.length))+"%";
+  const pr=await api(`/api/progress/${S.student.id}`);
+  $("stRank").textContent=pr.rank?("#"+pr.rank):"—";
+  $("stImprove").textContent=(pr.improvement>0?"+":"")+pr.improvement;
+  const pp=await api(`/api/practice-progress/${S.student.id}`);
+  $("stCoverage").textContent=pp.bank_coverage+"%";
+  $("weakList").innerHTML=pr.weak_topics.map(t=>
+    `<div class="row-line"><span class="n">🔸 ${t}</span></div>`).join("") ||
+    "<p class='muted'>Answer a few questions to find your weak topics!</p>";
+}
+async function renderHome(){ if(S.student) await loadPlan(); }
+
+// ---------- bank metadata (filters) ----------
+async function loadMeta(){
+  S.meta=await api("/api/bank/meta");
+  const tracks=[["all","All subjects"],["math","Mathematics"],["physics","Physics"],["chemistry","Chemistry"],["engg","Engineering"]];
+  $("fTrack").innerHTML=tracks.map(([v,l])=>`<option value="${v}">${l}</option>`).join("");
+  onTrackChange();
+}
+function onTrackChange(){
+  S.filterTrack=$("fTrack").value;
+  const subs=S.meta?.tracks?.[S.filterTrack]?.subjects || [];
+  $("fSubject").innerHTML=`<option value="all">All topics</option>`+
+    subs.map(s=>`<option value="${s.subject}">${s.subject} (${s.count})</option>`).join("");
+  S.filterSubject="all";
+}
+function setPmode(mode){
+  S.pmode=mode;
+  document.querySelectorAll("#pmode .seg-btn").forEach(b=>b.classList.toggle("on", b.dataset.mode===mode));
+  $("bankFilters").classList.toggle("hidden", mode==="adaptive");
+  nextQ();
+}
+
+// ---------- practice ----------
+async function nextQ(){
+  S.locked=false; $("fbBox").innerHTML=""; $("btnNext").classList.add("hidden");
+  if(!S.student) return;
+  const tr=(S.pmode==="adaptive")?"all":S.filterTrack;
+  const sb=(S.pmode==="adaptive")?"all":S.filterSubject;
+  const d=await api(`/api/practice/${S.student.id}?lang=en&mode=${S.pmode}&track=${tr}&subject=${sb}`);
+  S.curQ=d.question;
+  const q=d.question;
+  $("qTopic").textContent=`${q.subject} · ${q.topic}`;
+  const meta=[["","🟢 Easy","🟡 Medium","🔴 Hard"][d.difficulty]];
+  if(q.is_pyq) meta.push(`🔁 Repeated ${q.pyq_count}x (${q.pyq_years})`);
+  else meta.push("📘 Model question");
+  $("qMeta").innerHTML=meta.map(m=>`<span class="tag ${q.is_pyq?"g":""}">${m}</span>`).join(" ");
+  $("qText").textContent=q.q_en;
+  $("optBox").innerHTML=["a","b","c","d"].map(k=>
+    `<div class="opt" data-k="${k}" onclick="choose('${k}')"><span class="key">${k.toUpperCase()}</span><span>${q["opt_"+k]||""}</span></div>`).join("");
+  renderCoverage();
+}
+async function choose(k){
+  if(S.locked||!S.curQ) return; S.locked=true;
+  const q=S.curQ;
+  document.querySelectorAll("#optBox .opt").forEach(o=>{
+    o.classList.add("lock");
+    if(o.dataset.k===q.correct) o.classList.add("right");
+    else if(o.dataset.k===k) o.classList.add("wrong");
+  });
+  const r=await api("/api/answer",{method:"POST",body:JSON.stringify({
+    student_id:S.student.id,question_id:q.id,chosen:k,seconds:20,mode:"practice",lang:"en"})});
+  setXp(r.xp,r.streak);
+  const good=r.correct;
+  $("fbBox").innerHTML=`<div class="feedback ${good?"ok":"bad"}">
+     <div class="fb-title"><span>${good?"🎉 Correct!":"❌ Not quite. Answer: "+q.correct.toUpperCase()}</span><span class="src">${r.explanation_source==="ai"?"🤖 AI":"📘 Bank"}</span></div>
+     ${r.explanation}</div>`;
+  if(good) confetti();
+  $("btnNext").classList.remove("hidden");
+  renderCoverage();
+}
+
+// ---------- practice coverage ----------
+async function renderCoverage(){
+  if(!S.student) return;
+  const p=await api(`/api/practice-progress/${S.student.id}`);
+  let focus=p.tracks.find(t=>t.track===S.filterTrack) || null;
+  if(S.pmode==="adaptive") focus=null;
+  const covered = focus ? focus.attempted : p.bank_attempted;
+  const total   = focus ? focus.total    : p.bank_total;
+  const pct     = focus ? focus.coverage : p.bank_coverage;
+  $("covPct").textContent=`${covered} / ${total} Qs (${pct}%)`;
+  $("covBar").style.width=pct+"%";
+  const pyqDone = p.tracks.reduce((a,t)=>a+t.pyq_done,0);
+  const pyqTotal= p.tracks.reduce((a,t)=>a+t.pyq_total,0);
+  $("covDetail").innerHTML = `🔁 Repeated-question coverage: ${pyqDone}/${pyqTotal} · 🎯 Accuracy: ${focus?focus.accuracy:"—"}${focus?"%":""}`;
+}
+
+// ---------- mock ----------
+function openMockChooser(){
+  if(!S.student){ go("tab-login"); return; }
+  $("fullNote").textContent="The full paper uses the real ECET blueprint and marks.";
+  go("tab-mockstart");
+}
+async function startMock(mode){
+  const d=await api("/api/mock/start",{method:"POST",body:JSON.stringify({
+    name:S.student.name,roll_no:S.student.roll_no,branch:S.student.branch,lang:"en",mode})});
+  S.mock={id:d.mock_id,qs:d.questions,mode}; S.mIdx=0; S.mAns={};
+  $("mockGrid").innerHTML=d.questions.map((_,i)=>`<div class="mdot" id="md${i}" onclick="mockJump(${i})">${i+1}</div>`).join("");
+  renderMockQ(); go("tab-mock");
+}
+function renderMockQ(){
+  const q=S.mock.qs[S.mIdx];
+  $("mockNum").textContent=`Q${S.mIdx+1} / ${S.mock.qs.length}`;
+  $("mTopic").textContent=q.topic; $("mTrack").textContent=q.subject;
+  $("mText").textContent=q.q_en;
+  document.querySelectorAll(".mdot").forEach((d,i)=>d.classList.toggle("cur",i===S.mIdx));
+  $("mOptBox").innerHTML=["a","b","c","d"].map(k=>
+    `<div class="opt ${S.mAns[q.id]===k?"sel":""}" onclick="mChoose('${k}')"><span class="key">${k.toUpperCase()}</span><span>${q["opt_"+k]||""}</span></div>`).join("");
+}
+function mChoose(k){ const q=S.mock.qs[S.mIdx]; S.mAns[q.id]=k;
+  const dot=$("md"+S.mIdx); dot.classList.add("ans"); renderMockQ(); }
+function mockNav(d){ S.mIdx=Math.max(0,Math.min(S.mock.qs.length-1,S.mIdx+d)); renderMockQ(); }
+function mockJump(i){ S.mIdx=i; renderMockQ(); }
+async function submitMock(){
+  const r=await api("/api/mock/submit",{method:"POST",body:JSON.stringify({mock_id:S.mock.id,answers:S.mAns})});
+  $("resScore").textContent=r.score+"%";
+  $("resDetail").textContent=`${r.correct} / ${r.total} correct`;
+  $("resBar").style.width=r.score+"%";
+  $("resAdvice").textContent=r.score>=75?"Outstanding! You're in rank contention. 🏆":"Good attempt! Focus on your weak topics daily — Aria will re-plan tonight. 💪";
+  if(r.score>=50) confetti();
+  go("tab-result");
+}
+
+// ---------- progress ----------
+async function renderProgress(){
+  const p=await api(`/api/progress/${S.student.id}`);
+  setXp(p.xp,p.streak);
+  $("pgRank").textContent=p.rank?("#"+p.rank):"#—";
+  $("pgRankSub").textContent=`Rank ${p.rank||"—"} of ${p.cohort_size} students · ${p.my_xp} XP`;
+
+  $("pgLeaderboard").innerHTML=p.leaderboard.map((l,i)=>{
+    const cls = i===0?"gold":i===1?"silver":i===2?"bronze":"";
+    return `<div class="lb ${cls} ${l.id===S.student.id?"me":""}">
+      <div class="r">${i+1}</div>
+      <div class="nm">${l.name}${l.id===S.student.id?" (you)":""}<small>${l.roll_no} · ${l.branch}</small></div>
+      <div class="xp">${l.xp} XP</div></div>`;}).join("");
+
+  const pp=await api(`/api/practice-progress/${S.student.id}`);
+  $("pgRing").innerHTML=ringSVG(pp.overall_accuracy, "ACCURACY");
+  $("pgCovPct").textContent=`${pp.bank_attempted}/${pp.bank_total} Qs`;
+  $("pgCovBar").style.width=pp.bank_coverage+"%";
+  $("pgCovTracks").innerHTML=pp.tracks.map(t=>`
+    <div class="row-line"><span class="n"><span class="s-ic-inline">${subjIcon(t.label)}</span>${t.label}</span><span class="p">${t.attempted}/${t.total} · ${t.accuracy}% acc</span></div>
+    <div class="bar" style="margin:0 0 8px"><i style="width:${t.coverage}%"></i></div>
+    <div class="muted" style="margin:-4px 0 12px;font-size:.66rem">🔁 Repeated: ${t.pyq_done}/${t.pyq_total}</div>`).join("");
+
+  const last14=p.daily.slice(-14);
+  const mx=Math.max(...last14.map(d=>d.total),1);
+  $("dailyBars").innerHTML=last14.map(d=>
+    `<div class="b" style="height:${Math.max(6,100*d.total/mx)}%" title="${d.d}: ${d.ok}/${d.total}"><span>${d.ok||0}</span></div>`).join("")||"<p class='muted'>No data yet.</p>";
+  $("mockBars").innerHTML=p.mock_scores.map(s=>
+    `<div class="b" style="height:${Math.max(6,s)}%"><span>${s}</span></div>`).join("")||"<p class='muted'>Take your first mock!</p>";
+  $("mockGain").textContent=p.mock_scores.length>=2?`Gain: ${p.improvement>0?"+":""}${p.improvement} marks since first mock 🚀`:"";
+  $("subjList").innerHTML=p.subjects.map(s=>`
+    <div class="row-line"><span class="n"><span class="s-ic-inline">${subjIcon(s.subject)}</span>${s.subject}</span><span class="p">${s.accuracy}%</span></div>
+    <div class="bar" style="margin:0 0 12px"><i style="width:${s.accuracy}%"></i></div>`).join("");
+  const weakSet=new Set(p.weak_topics);
+  $("topicList").innerHTML=p.topics.slice(0,10).map(t=>`
+    <div class="row-line"><span class="n">${weakSet.has(t.topic)?"🔸":"✅"} ${t.topic}</span><span class="p">${t.mastery}% · ${t.attempts}Q</span></div>
+    <div class="bar" style="margin:0 0 12px"><i style="width:${t.mastery}%"></i></div>`).join("");
+}
+
+// ---------- impact ----------
+async function renderImpact(){
+  const c=await api(`/api/cohort`);
+  $("impactKpis").innerHTML=`
+    <div class="kpi"><div class="v">${c.students_improved}</div><div class="l">students improved mock scores 📈</div></div>
+    <div class="kpi"><div class="v">${c.improvement_rate}%</div><div class="l">of active cohort improved</div></div>
+    <div class="kpi"><div class="v">+${c.avg_gain}</div><div class="l">avg marks gained per student</div></div>
+    <div class="kpi"><div class="v">+${c.best_gain}</div><div class="l">best individual gain 🌟</div></div>`;
+  $("lbList").innerHTML=c.leaderboard.map((l,i)=>`
+    <div class="lb ${l.roll_no===S.student?.roll_no?"me":""}">
+      <div class="r">${i+1}</div>
+      <div class="nm">${l.name}<small>${l.roll_no} · ${l.branch}</small></div>
+      <div class="xp">${l.xp} XP</div>
+    </div>`).join("");
+}
+
+// ---------- events ----------
+$("btnTheme").onclick=()=>setTheme(document.documentElement.dataset.theme==="light"?"dark":"light");
+
+// boot
+loadMeta().catch(()=>{});
+</script>
+</body>
+</html>
